@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     https://www.apache.org/licenses/LICENSE-2.0
+//	https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,12 +16,41 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/zclconf/go-cty/cty"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 )
+
+// KongApiGatewayPayload represents the structure of your expected JSON payload.
+// Adjust fields and types according to your actual JSON structure.
+type KongApiGatewayPayload struct {
+	SslCertBase64        string `json:"sslCertBase64"`
+	SslCertKeyBase64     string `json:"sslCertKeyBase64"`
+	KongApiGatewayDomain string `json:"kongApiGatewayDomain"`
+}
+
+// GetJSONPayload parses the JSON payload from an http.Request and returns it.
+// It decodes the JSON into the provided `v` interface.
+func GetJSONPayload(r *http.Request, v interface{}) error {
+	defer r.Body.Close()
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(v); err != nil {
+		if err == io.EOF {
+			return fmt.Errorf("empty request body")
+		}
+		return fmt.Errorf("failed to decode JSON payload: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		return fmt.Errorf("request body contains unexpected extra data after JSON payload")
+	}
+
+	return nil
+}
 
 func kongHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -29,13 +58,12 @@ func kongHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var payload map[string]interface{}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil && err.Error() != "EOF" {
-		log.Printf("Error decoding incoming request body: %v", err)
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+	var payload KongApiGatewayPayload
+	err := GetJSONPayload(r, &payload)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	defer r.Body.Close()
 
 	packerConfigFile := hclwrite.NewEmptyFile()
 	config := packerConfigFile.Body()
@@ -87,11 +115,11 @@ func kongHandler(w http.ResponseWriter, r *http.Request) {
 	provisionerBlock := buildBody.AppendNewBlock("provisioner", []string{"qubitpi-kong-api-gateway-provisioner"})
 	provisionerBody := provisionerBlock.Body()
 	provisionerBody.SetAttributeValue("homeDir", cty.StringVal("/home/ubuntu"))
-	provisionerBody.SetAttributeValue("sslCertBase64", cty.StringVal(payload["sslCertBase64"].(string)))
-	provisionerBody.SetAttributeValue("sslCertKeyBase64", cty.StringVal(payload["sslCertKeyBase64"].(string)))
-	provisionerBody.SetAttributeValue("kongApiGatewayDomain", cty.StringVal(payload["kongApiGatewayDomain"].(string)))
+	provisionerBody.SetAttributeValue("sslCertBase64", cty.StringVal(payload.SslCertBase64))
+	provisionerBody.SetAttributeValue("sslCertKeyBase64", cty.StringVal(payload.SslCertKeyBase64))
+	provisionerBody.SetAttributeValue("kongApiGatewayDomain", cty.StringVal(payload.KongApiGatewayDomain))
 
-	err := ioutil.WriteFile("kong.pkr.hcl", packerConfigFile.Bytes(), 0644)
+	err = ioutil.WriteFile("kong.pkr.hcl", packerConfigFile.Bytes(), 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
