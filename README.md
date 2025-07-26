@@ -42,7 +42,7 @@ License
 
 The use and distribution terms for [Henschel]() are covered by the [Apache License, Version 2.0].
 
-[Apache License Badge]: https://img.shields.io/badge/Apache%202.0-FE5D26.svg?style=for-the-badge&logo=Apache&logoColor=white
+[Apache License Badge]: https://img.shields.io/github/license/QubitPi/Henschel?style=for-the-badge&logo=Apache&logoColor=white&labelColor=FF7777&color=00B8A9
 [Apache License, Version 2.0]: https://www.apache.org/licenses/LICENSE-2.0
 
 [GitHub Workflow Status]: https://img.shields.io/github/actions/workflow/status/QubitPi/Henschel/ci-cd.yaml?branch=master&logo=github&style=for-the-badge&label=CI/CD&labelColor=2088FF

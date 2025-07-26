@@ -18,6 +18,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 )
@@ -107,5 +109,11 @@ func TestKongHandler(t *testing.T) {
 	if status := rr.Code; status != http.StatusOK {
 		t.Errorf("Handler returned wrong status code: got %v want %v",
 			status, http.StatusOK)
+	}
+
+	actualContent, err := os.ReadFile(filepath.Join(".", "kong.pkr.hcl"))
+	expectedContent, err := os.ReadFile(filepath.Join("testdata", "kong.pkr.hcl"))
+	if !bytes.Equal(actualContent, expectedContent) {
+		t.Errorf("generated file content mismatch:\nExpected:\n%s\nGot:\n%s", expectedContent, actualContent)
 	}
 }
