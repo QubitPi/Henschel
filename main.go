@@ -20,9 +20,9 @@ import (
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/zclconf/go-cty/cty"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 )
 
 // KongApiGatewayPayload represents the structure of your expected JSON payload.
@@ -119,7 +119,7 @@ func kongHandler(w http.ResponseWriter, r *http.Request) {
 	provisionerBody.SetAttributeValue("sslCertKeyBase64", cty.StringVal(payload.SslCertKeyBase64))
 	provisionerBody.SetAttributeValue("kongApiGatewayDomain", cty.StringVal(payload.KongApiGatewayDomain))
 
-	err = ioutil.WriteFile("kong.pkr.hcl", packerConfigFile.Bytes(), 0644)
+	err = os.WriteFile("kong.pkr.hcl", packerConfigFile.Bytes(), 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
