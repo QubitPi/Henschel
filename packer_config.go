@@ -24,12 +24,31 @@ import (
 
 // GeneratePackerConfigFile creates a Packer HCL configuration file named "kong.pkr.hcl"
 // based on the provided KongApiGatewayPayload.
-// It defines required plugins, source AMI configuration, and provisioner settings.
+// It orchestrates the creation of different HCL blocks by calling helper functions.
 func GeneratePackerConfigFile(payload KongApiGatewayPayload) error {
 	packerConfigFile := hclwrite.NewEmptyFile()
 	config := packerConfigFile.Body()
 
-	packerBlock := config.AppendNewBlock("required_plugins", nil)
+	addRequiredPlugins(config)
+	config.AppendNewline()
+
+	addSourceBlock(config)
+	config.AppendNewline()
+
+	addBuildBlock(config, payload)
+
+	err := os.WriteFile("kong.pkr.hcl", packerConfigFile.Bytes(), 0644)
+	if err != nil {
+		log.Printf("Failed to write Packer configuration file: %v", err)
+		return err
+	}
+	return nil
+}
+
+// addRequiredPlugins adds the 'required_plugins' block to the HCL body.
+// This block defines the necessary Packer plugins (amazon and qubitpi).
+func addRequiredPlugins(body *hclwrite.Body) {
+	packerBlock := body.AppendNewBlock("required_plugins", nil)
 	packerBody := packerBlock.Body()
 
 	amazonBlock := packerBody.AppendNewBlock("amazon", nil)
@@ -41,10 +60,12 @@ func GeneratePackerConfigFile(payload KongApiGatewayPayload) error {
 	qubitPiBody := qubitPiBlock.Body()
 	qubitPiBody.SetAttributeValue("version", cty.StringVal(">= 0.0.50"))
 	qubitPiBody.SetAttributeValue("source", cty.StringVal("github.com/QubitPi/qubitpi"))
+}
 
-	config.AppendNewline()
-
-	resourceBlock := config.AppendNewBlock("source", []string{"amazon-ebs", "qubitpi"})
+// addSourceBlock adds the 'source' block to the HCL body.
+// This block defines the source AMI and instance configuration for building the image.
+func addSourceBlock(body *hclwrite.Body) {
+	resourceBlock := body.AppendNewBlock("source", []string{"amazon-ebs", "qubitpi"})
 	resourceBody := resourceBlock.Body()
 	resourceBody.SetAttributeValue("ami_name", cty.StringVal("my-kong-api-gateway"))
 	resourceBody.SetAttributeValue("force_deregister", cty.StringVal("true"))
@@ -70,12 +91,14 @@ func GeneratePackerConfigFile(payload KongApiGatewayPayload) error {
 	launchBlockDeviceMappingsBody.SetAttributeValue("volume_size", cty.NumberIntVal(8))
 	launchBlockDeviceMappingsBody.SetAttributeValue("volume_type", cty.StringVal("gp2"))
 	launchBlockDeviceMappingsBody.SetAttributeValue("delete_on_termination", cty.BoolVal(true))
+}
 
-	config.AppendNewline()
-
-	buildBlock := config.AppendNewBlock("build", nil)
+// addBuildBlock adds the 'build' block to the HCL body.
+// This block defines the build process and includes the 'provisioner' block.
+func addBuildBlock(body *hclwrite.Body, payload KongApiGatewayPayload) {
+	buildBlock := body.AppendNewBlock("build", nil)
 	buildBody := buildBlock.Body()
-	sources := []string{"source.amazon-ebs.qubitpi"}
+	sources := []string{"source.amazon-ebs.qubitpi"} // Reference the defined source
 	buildBody.SetAttributeValue("sources", cty.ListVal([]cty.Value{cty.StringVal(sources[0])}))
 
 	provisionerBlock := buildBody.AppendNewBlock("provisioner", []string{"qubitpi-kong-api-gateway-provisioner"})
@@ -84,11 +107,4 @@ func GeneratePackerConfigFile(payload KongApiGatewayPayload) error {
 	provisionerBody.SetAttributeValue("sslCertBase64", cty.StringVal(payload.SslCertBase64))
 	provisionerBody.SetAttributeValue("sslCertKeyBase64", cty.StringVal(payload.SslCertKeyBase64))
 	provisionerBody.SetAttributeValue("kongApiGatewayDomain", cty.StringVal(payload.KongApiGatewayDomain))
-
-	err := os.WriteFile("kong.pkr.hcl", packerConfigFile.Bytes(), 0644)
-	if err != nil {
-		log.Printf("Failed to write Packer configuration file: %v", err)
-		return err
-	}
-	return nil
 }
