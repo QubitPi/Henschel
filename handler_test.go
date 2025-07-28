@@ -116,7 +116,7 @@ func TestKongHandler(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 
-	kongHandler(rr, req)
+	KongHandler(rr, req)
 
 	if status := rr.Code; status != http.StatusOK {
 		t.Errorf("Handler returned wrong status code: got %v want %v",
