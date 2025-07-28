@@ -42,16 +42,28 @@ func TestGetJSONPayload(t *testing.T) {
 			expectError: false,
 		},
 		{
+			name:        "Missing required field (Kong domain)",
+			payload:     `{"sslCertBase64": "foo", "sslCertKeyBase64": "bar"}`,
+			expected:    nil,
+			expectError: true,
+		},
+		{
 			name:        "Invalid JSON payload (Malformed JSON)",
 			payload:     `{"name": "Jane Doe", "email": "jane.doe@example.com",`,
 			expected:    nil,
 			expectError: true,
 		},
 		{
+			name:        "JSON payload with fields not present in the target struct",
+			payload:     `{"foo": "foo", "sslCertKeyBase64": "bar", "kongApiGatewayDomain": "bat"}`,
+			expected:    nil,
+			expectError: true,
+		},
+		{
 			name:        "Empty JSON payload",
 			payload:     `{}`,
-			expected:    &KongApiGatewayPayload{},
-			expectError: false,
+			expected:    nil,
+			expectError: true,
 		},
 	}
 

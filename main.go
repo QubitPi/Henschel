@@ -33,6 +33,21 @@ type KongApiGatewayPayload struct {
 	KongApiGatewayDomain string `json:"kongApiGatewayDomain"`
 }
 
+// Validate checks if all required fields of the KongApiGatewayPayload struct are present and valid.
+// It returns an error if any required field is missing or has an invalid value.
+func (u *KongApiGatewayPayload) Validate() error {
+	if u.SslCertBase64 == "" {
+		return fmt.Errorf("sslCertBase64 is a required field and cannot be empty")
+	}
+	if u.SslCertKeyBase64 == "" {
+		return fmt.Errorf("sslCertKeyBase64 is a required field and cannot be empty")
+	}
+	if u.KongApiGatewayDomain == "" {
+		return fmt.Errorf("kongApiGatewayDomain is a required field and cannot be empty")
+	}
+	return nil
+}
+
 // GetJSONPayload parses the JSON payload from an http.Request and returns it.
 // It decodes the JSON into the provided `v` interface.
 func GetJSONPayload(r *http.Request, v interface{}) error {
@@ -48,6 +63,11 @@ func GetJSONPayload(r *http.Request, v interface{}) error {
 	if err := decoder.Decode(&struct{}{}); err != io.EOF {
 		return fmt.Errorf("request body contains unexpected extra data after JSON payload")
 	}
+	if validator, ok := v.(interface{ Validate() error }); ok {
+		if err := validator.Validate(); err != nil {
+			return fmt.Errorf("missing or invalid required field: %w", err)
+		}
+	}
 
 	return nil
 }
@@ -59,8 +79,8 @@ func kongHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var payload KongApiGatewayPayload
-	err := GetJSONPayload(r, &payload)
-	if err != nil {
+	if err := GetJSONPayload(r, &payload); err != nil {
+		log.Printf("Error parsing payload: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -119,7 +139,7 @@ func kongHandler(w http.ResponseWriter, r *http.Request) {
 	provisionerBody.SetAttributeValue("sslCertKeyBase64", cty.StringVal(payload.SslCertKeyBase64))
 	provisionerBody.SetAttributeValue("kongApiGatewayDomain", cty.StringVal(payload.KongApiGatewayDomain))
 
-	err = os.WriteFile("kong.pkr.hcl", packerConfigFile.Bytes(), 0644)
+	err := os.WriteFile("kong.pkr.hcl", packerConfigFile.Bytes(), 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
